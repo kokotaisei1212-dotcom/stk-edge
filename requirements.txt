@@ -1,0 +1,8 @@
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx
+numpy==2.5.3
+scipy
+scikit-learn==1.9.1
+spacy==3.8.18
+en_core_web_md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
