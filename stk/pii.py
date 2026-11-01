@@ -2,7 +2,7 @@
 
 Two layers: patterns (emails, cards, phones, long IDs, addresses, usernames, stated names) and, when the
 language model is installed, named-entity detection for person names anywhere in the text. Batches go through
-`mask_many`, which runs the entity model over all texts at once (2-3x faster than one call per text)."""
+`mask_many`, which runs the entity model over all texts at once."""
 import os, re
 
 _RULES = [
@@ -49,8 +49,7 @@ def _rules(text: str, known: list[str] | None) -> str:
 
 
 def _english_like(text: str, lang: str | None) -> bool:
-    """The entity model knows English. On other languages it tags whole sentences as names and destroys the signal
-    (found in the 30-center world: 21 of 60 Japanese and 47 of 60 Spanish messages mangled), so it runs only on text
+    """The entity model knows English. On other languages it tags whole sentences as names, so it runs only on text
     declared English (or undeclared) and written mostly in Latin letters."""
     if lang and not str(lang).lower().startswith("en"):
         return False
