@@ -1,12 +1,13 @@
 # STK edge
 
 Run this next to your contact center platform and the conversation text does not leave your cloud. It masks personal
-data (emails, phone and card numbers, long ids, addresses, usernames, "my name is …", English and Japanese person
-names, and any values you pass in `known_pii`), turns the customer's first messages into hashed counts of word and character pieces, drops
+data (emails, phone and card numbers, long ids, addresses, usernames, person names checked in 15 languages (see
+https://stk-evidence.com/docs#names), and any values you pass in `known_pii`, in every language), turns the customer's first messages into hashed counts of word and character pieces, drops
 the words, and forwards the request to STK.
 
 ```
 docker run -p 8001:8001 -e STK_KEY=stk_ai_... -e STK_FEATURE_KEY=<hex> ghcr.io/kokotaisei1212-dotcom/stk-edge:latest
+# add -e STK_PII_MULTI=1 for the multilingual name model (about 280 MB more): European languages and Tagalog
 ```
 
 Then call `http://edge:8001` wherever the STK integration guide (https://stk-evidence.com/integrate) says
