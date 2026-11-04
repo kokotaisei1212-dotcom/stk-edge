@@ -17,8 +17,8 @@ Then call `http://edge:8001` wherever the STK integration guide (https://stk-evi
 `https://api.stk-evidence.com`. Same requests, same answers.
 
 What is rewritten: `turns` on `POST /v1/decide`, `/v1/conversations` and `/v1/history` become masked hashed features.
-What is forwarded unchanged: everything else, including `POST /v1/ingest` (your own JSON): to keep words in your
-cloud, send finished conversations as `/v1/conversations` through the shim, or without text at all.
+What is forwarded unchanged: everything else. To keep words in your cloud, send finished conversations as
+`/v1/conversations` through the shim, or without text at all.
 
 The hashing itself is public (see `stk/features.py`), so the numbers alone could be tested against guessed words.
 Two things stop that: masking runs first, and with `STK_FEATURE_KEY` (your center's own key: `GET
