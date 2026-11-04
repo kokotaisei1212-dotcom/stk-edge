@@ -1,4 +1,4 @@
-"""Mask personal data the moment a conversation arrives. Nothing unmasked is stored or learned from.
+"""Mask personal data the moment a conversation arrives, before it is hashed; the text is not stored.
 
 Two layers: patterns (emails, cards, phones, long IDs, addresses, usernames, stated names) and, when the
 language model is installed, named-entity detection for person names anywhere in the text. Batches go through
