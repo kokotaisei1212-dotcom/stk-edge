@@ -42,7 +42,13 @@ try:  # the shim is optional: the library part works without FastAPI
     from fastapi import FastAPI, Header, Request, Response
     import httpx
 
-    app = FastAPI(title="STK edge", version="0.9.0")
+    app = FastAPI(title="STK edge", version="0.12.0")
+
+    @app.on_event("startup")
+    def _warm():
+        # the name model takes about 2 seconds to load: load it now, so the first call is not slower than 300 ms
+        import threading
+        threading.Thread(target=lambda: mask("warm up with John Smith"), daemon=True).start()
     STK_URL = os.environ.get("STK_URL", "https://api.stk-evidence.com").rstrip("/")
     STK_KEY = os.environ.get("STK_KEY", "")
 
@@ -54,20 +60,34 @@ try:  # the shim is optional: the library part works without FastAPI
         headers = {"X-STK-Key": x_stk_key or STK_KEY}
         if request.headers.get("X-STK-Signature"):
             headers["X-STK-Signature"] = request.headers["X-STK-Signature"]  # note: a signature over the original body will not match the rewritten one
-        async with httpx.AsyncClient(timeout=60) as cli:
-            r = await cli.post(f"{STK_URL}/v1/{path}", json=body, headers=headers)
+        # /v1/decide waits at most 2 s: your code stops at 300 ms anyway; the rest (history, conversations) up to 60 s
+        try:
+            async with httpx.AsyncClient(timeout=2 if path == "decide" else 60) as cli:
+                r = await cli.post(f"{STK_URL}/v1/{path}", json=body, headers=headers)
+        except httpx.HTTPError:
+            # STK did not answer: say so at once; your code routes as it did before STK
+            return Response(content=b'{"error": {"code": "unavailable", "message": "STK did not answer.", "fix": "Route as before STK."}}',
+                            status_code=503, media_type="application/json")
         return Response(content=r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
     @app.get("/v2/{path:path}")
     async def forward_get_v2(path: str, request: Request, x_stk_key: str | None = Header(None)):
-        async with httpx.AsyncClient(timeout=60) as cli:
-            r = await cli.get(f"{STK_URL}/v2/{path}", params=dict(request.query_params), headers={"X-STK-Key": x_stk_key or STK_KEY})
+        try:
+            async with httpx.AsyncClient(timeout=10) as cli:
+                r = await cli.get(f"{STK_URL}/v2/{path}", params=dict(request.query_params), headers={"X-STK-Key": x_stk_key or STK_KEY})
+        except httpx.HTTPError:
+            return Response(content=b'{"error": {"code": "unavailable", "message": "STK did not answer.", "fix": "Route as before STK."}}',
+                            status_code=503, media_type="application/json")
         return Response(content=r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
     @app.get("/v1/{path:path}")
     async def forward_get(path: str, request: Request, x_stk_key: str | None = Header(None)):
-        async with httpx.AsyncClient(timeout=60) as cli:
-            r = await cli.get(f"{STK_URL}/v1/{path}", params=dict(request.query_params), headers={"X-STK-Key": x_stk_key or STK_KEY})
+        try:
+            async with httpx.AsyncClient(timeout=10) as cli:
+                r = await cli.get(f"{STK_URL}/v1/{path}", params=dict(request.query_params), headers={"X-STK-Key": x_stk_key or STK_KEY})
+        except httpx.HTTPError:
+            return Response(content=b'{"error": {"code": "unavailable", "message": "STK did not answer.", "fix": "Route as before STK."}}',
+                            status_code=503, media_type="application/json")
         return Response(content=r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 except ImportError:  # pragma: no cover
     app = None

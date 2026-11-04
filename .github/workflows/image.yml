@@ -23,5 +23,5 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/kokotaisei1212-dotcom/stk-edge:latest
+          tags: ghcr.io/kokotaisei1212-dotcom/stk-edge:latest,ghcr.io/kokotaisei1212-dotcom/stk-edge:0.12.0
           labels: org.opencontainers.image.source=https://github.com/kokotaisei1212-dotcom/stk-edge
