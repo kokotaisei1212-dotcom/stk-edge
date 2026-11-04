@@ -10,6 +10,9 @@ docker run -p 8001:8001 -e STK_KEY=stk_ai_... -e STK_FEATURE_KEY=<hex> ghcr.io/k
 # add -e STK_PII_MULTI=1 for the multilingual name model (about 280 MB more): European languages and Tagalog
 ```
 
+`GET /health` on the container answers `{"ok": true, "version": ..., "stk_reachable": ...}` for your monitoring; it also
+tells STK once a minute that it is alive (only its version), and STK emails you if it goes quiet for an hour.
+
 Then call `http://edge:8001` wherever the STK integration guide (https://stk-evidence.com/integrate) says
 `https://api.stk-evidence.com`. Same requests, same answers.
 

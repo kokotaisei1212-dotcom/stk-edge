@@ -42,13 +42,34 @@ try:  # the shim is optional: the library part works without FastAPI
     from fastapi import FastAPI, Header, Request, Response
     import httpx
 
-    app = FastAPI(title="STK edge", version="0.12.0")
+    app = FastAPI(title="STK edge", version="0.13.0")
+
+    VERSION = "0.13.0"
+    _LAST = {"ok": None, "at": None}
+
+    def _beat():
+        """Once a minute, only the version: STK emails you (and STK) if stk-edge goes quiet for an hour."""
+        import time as _t
+        while True:
+            try:
+                r = httpx.post(f"{STK_URL}/v1/edge/heartbeat", json={"version": VERSION}, headers={"X-STK-Key": STK_KEY}, timeout=10)
+                _LAST.update(ok=r.status_code == 200, at=_t.time())
+            except httpx.HTTPError:
+                _LAST.update(ok=False, at=_t.time())
+            _t.sleep(60)
 
     @app.on_event("startup")
     def _warm():
         # the name model takes about 2 seconds to load: load it now, so the first call is not slower than 300 ms
         import threading
         threading.Thread(target=lambda: mask("warm up with John Smith"), daemon=True).start()
+        if STK_KEY:
+            threading.Thread(target=_beat, daemon=True).start()
+
+    @app.get("/health")
+    def health():
+        """For your own monitoring: stk-edge is up, and whether its last heartbeat reached STK."""
+        return {"ok": True, "version": VERSION, "stk_reachable": _LAST["ok"], "last_heartbeat": _LAST["at"]}
     STK_URL = os.environ.get("STK_URL", "https://api.stk-evidence.com").rstrip("/")
     STK_KEY = os.environ.get("STK_KEY", "")
 
