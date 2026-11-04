@@ -1,6 +1,6 @@
 """The edge: runs in your own cloud when no words may leave it. It masks personal data and turns the customer's
 first messages into hashed counts (see stk.features), then forwards the same JSON STK expects, with `features` in
-place of `turns`. STK's servers see numbers that cannot be turned back into the sentence.
+place of `turns`. The conversation text does not leave your cloud: STK receives numbers, not words.
 
 Use it as a library:
     from stk.edge import prepare
@@ -8,12 +8,12 @@ Use it as a library:
     httpx.post(STK + "/v1/decide", json=[{**body, "customer_id": "c-1"}], headers={"X-STK-Key": KEY})
 
 Or as a shim: point your platform at this container instead of STK; it rewrites and forwards.
-    STK_URL=https://api.stk-evidence.com STK_KEY=stk_... uvicorn stk.edge:app --port 8001
+    STK_URL=https://api.stk-evidence.com STK_KEY=stk_ai_... STK_FEATURE_KEY=<hex> uvicorn stk.edge:app --port 8001
 No state, no storage: it holds nothing between requests. Only the pii rules and the hashing run here."""
 from __future__ import annotations
 import os
 from .pii import mask
-from .features import hash_text
+from .features import features
 
 READ_MESSAGES = int(os.environ.get("STK_READ_MESSAGES", "5"))
 
@@ -24,7 +24,7 @@ def customer_text(turns: list[dict], first_n: int = READ_MESSAGES) -> str:
 
 def prepare(turns: list[dict], known_pii: list[str] | None = None, read_messages: int = READ_MESSAGES) -> dict:
     """Mask here, hash here, send numbers."""
-    return {"features": hash_text(mask(customer_text(turns, read_messages), known_pii))}
+    return {"features": features(mask(customer_text(turns, read_messages), known_pii))}
 
 
 def rewrite(items: list[dict]) -> list[dict]:

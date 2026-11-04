@@ -1,12 +1,12 @@
 # STK edge
 
-Run this next to your contact center platform and no conversation text leaves your network. It masks personal data
-(emails, phone and card numbers, long ids, addresses, usernames, "my name is …", English person names, and any values
-you pass in `known_pii`), turns the customer's first messages into hashed counts of word and character pieces, drops
+Run this next to your contact center platform and the conversation text does not leave your cloud. It masks personal
+data (emails, phone and card numbers, long ids, addresses, usernames, "my name is …", English and Japanese person
+names, and any values you pass in `known_pii`), turns the customer's first messages into hashed counts of word and character pieces, drops
 the words, and forwards the request to STK.
 
 ```
-docker run -p 8001:8001 -e STK_KEY=stk_... ghcr.io/kokotaisei1212-dotcom/stk-edge:latest
+docker run -p 8001:8001 -e STK_KEY=stk_ai_... -e STK_FEATURE_KEY=<hex> ghcr.io/kokotaisei1212-dotcom/stk-edge:latest
 ```
 
 Then call `http://edge:8001` wherever the STK integration guide (https://stk-evidence.com/integrate) says
@@ -16,7 +16,10 @@ What is rewritten: `turns` on `POST /v1/decide`, `/v1/conversations` and `/v1/hi
 What is forwarded unchanged: everything else, including `POST /v1/ingest` (your own JSON): to keep words in your
 cloud, send finished conversations as `/v1/conversations` through the shim, or without text at all.
 
-The hashing is public (see `stk/features.py`): the numbers are not sentences, but someone holding them could test
-whether a given word appears. That is why masking runs first.
+The hashing itself is public (see `stk/features.py`), so the numbers alone could be tested against guessed words.
+Two things stop that: masking runs first, and with `STK_FEATURE_KEY` (your center's own key: `GET
+https://api.stk-evidence.com/v1/keys/feature` with your admin key) the positions are moved by your own secret
+permutation before they leave. Without `STK_FEATURE_KEY`, STK applies the same key the moment the numbers arrive,
+before anything is stored.
 
 This is the only part of STK that runs in your cloud. The STK engine is not included. See LICENSE.
