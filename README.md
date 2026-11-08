@@ -27,3 +27,15 @@ permutation before they leave. Without `STK_FEATURE_KEY`, STK applies the same k
 before anything is stored.
 
 This is the only part of STK that runs in your cloud. The STK engine is not included. See LICENSE.
+
+## Why customers came back (0.14)
+
+Send the words of each finished conversation with it, through stk-edge: `"turns": [{"role", "text"}]` on
+`POST /v1/conversations`. stk-edge keeps them in your cloud for 7 days (`STK_EDGE_DATA`, a volume of yours) and then
+deletes them. STK never receives them: they are taken out before the conversation is forwarded.
+
+Set your own model with one line, `STK_WHY_MODEL="<base url>|<api key>|<model>"` (any OpenAI-compatible
+`/chat/completions`, or `https://api.anthropic.com`). Once a week, on the last day of STK's week, stk-edge asks STK
+which cells had conversations whose customer came back, reads the words it holds for them with your model, and sends
+STK one masked sentence per cell (and how many it read). Nothing else. Without `STK_WHY_MODEL` nothing is read and the
+proxy works as before. The code: `stk/why.py`.
