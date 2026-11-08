@@ -44,12 +44,12 @@ class Store:
             return
         with self._lock, self._db() as db:
             db.execute("INSERT OR REPLACE INTO words(id, at, turns, pinned) VALUES(?,?,?,0)", (str(conversation_id), now, json.dumps(clean)))
-            db.execute("DELETE FROM words WHERE at < ? AND pinned=0", (now - KEEP_S,))
+            db.execute("DELETE FROM words WHERE (at < ? AND pinned=0) OR at < ?", (now - KEEP_S, now - 2 * KEEP_S))
 
     def get(self, ids: list[str], now: float | None = None) -> dict:
         now = now or time.time()
         with self._lock, self._db() as db:
-            db.execute("DELETE FROM words WHERE at < ? AND pinned=0", (now - KEEP_S,))
+            db.execute("DELETE FROM words WHERE (at < ? AND pinned=0) OR at < ?", (now - KEEP_S, now - 2 * KEEP_S))
             out = {}
             for i in ids:
                 r = db.execute("SELECT turns FROM words WHERE id=?", (str(i),)).fetchone()
@@ -127,13 +127,19 @@ def ask(cfg: dict, system: str, user: str, post=None, timeout: float = 60) -> st
     return r.json()["choices"][0]["message"]["content"]
 
 
-def one_sentence(raw: str) -> str:
-    """The first sentence only, masked, and never longer than the limit."""
-    s = re.sub(r"\s+", " ", (raw or "")).strip().strip('"“”\'')
+def one_sentence(raw) -> str:
+    """The first sentence, masked; or "" when the answer is not one (empty, markup or JSON, no words, too long). A
+    broken answer is never cut into shape and shown: nothing is shown instead."""
+    if not isinstance(raw, str):
+        return ""
+    s = re.sub(r"\s+", " ", raw).strip().strip('"“”\'').strip()
+    if not s or s[0] in "{[<" or "```" in s or not re.search(r"\w{3}", s):
+        return ""
     m = re.search(r"^(.+?[.!?。！？])(\s|$)", s)
     s = (m.group(1) if m else s).strip()
-    s = mask(s)
-    return s if len(s) <= MAX_SENTENCE else s[:MAX_SENTENCE - 1].rstrip() + "…"
+    if len(s) > MAX_SENTENCE or len(s) < 8:
+        return ""
+    return mask(s)
 
 
 def pin_from_queue(stk_get, store: Store) -> int:
@@ -151,8 +157,10 @@ def read_week(stk_get, stk_post, store: Store, cfg: dict | None, now: float | No
         return []
     now = now or time.time()
     q = stk_get("/v1/edge/why-queue")
-    week, language, sent = q.get("week"), q.get("language", "en"), []
+    week, sent = q.get("week"), []
     for cell in q.get("cells", []):
+        part = (str(cell["cell"]).split("|") + ["", "", "", ""])[2]
+        language = part if part and part != "unknown" else q.get("language", "en")      # the cell's language
         convs = cell.get("conversations", [])[:MAX_CONVERSATIONS]
         words = store.get([c["id"] for c in convs] + [c["returned_as"] for c in convs if c.get("returned_as")], now)
         items = [{"finished": words[c["id"]], "returned": words.get(c.get("returned_as"))} for c in convs if c["id"] in words]
@@ -160,14 +168,16 @@ def read_week(stk_get, stk_post, store: Store, cfg: dict | None, now: float | No
             continue          # none of these passed through this stk-edge: nothing to read
         system, user = prompt(items, language)
         try:
-            raw = (ask_fn or ask)(cfg, system, user)
+            s = one_sentence((ask_fn or ask)(cfg, system, user))
         except Exception:
-            continue          # the model did not answer: this cell waits for next week; nothing fails
-        s = one_sentence(raw)
+            s = ""            # an error, a timeout, a body that is not JSON: the same as no answer
         if s:
             stk_post("/v1/edge/why", {"week": week, "cell": cell["cell"], "sentence": s, "n": len(items)})
             sent.append({"cell": cell["cell"], "sentence": s, "n": len(items)})
-            store.forget(list(words))     # read: deleted
+        else:                 # nothing shown for this cell this week: better nothing than a strange sentence
+            stk_post("/v1/edge/why", {"week": week, "cell": cell["cell"], "failed": True, "n": len(items)})
+            sent.append({"cell": cell["cell"], "failed": True, "n": len(items)})
+        store.forget(list(words))         # read (or tried): deleted
     if week is not None:
         store.done_week(week)
     return sent
