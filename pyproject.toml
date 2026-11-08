@@ -1,6 +1,6 @@
 [project]
 name = "stk-edge"
-version = "0.14.0"
+version = "0.15.0"
 description = "STK edge: masks, hashes and forwards conversation text in your own cloud. The STK engine is not included."
 requires-python = ">=3.11"
 dependencies = ["fastapi", "uvicorn", "httpx", "scikit-learn", "numpy"]

@@ -10,14 +10,23 @@ docker run -p 8001:8001 -e STK_KEY=stk_ai_... -e STK_FEATURE_KEY=<hex> ghcr.io/k
 # add -e STK_PII_MULTI=1 for the multilingual name model (about 280 MB more): European languages and Tagalog
 ```
 
-`GET /health` on the container answers `{"ok": true, "version": ..., "stk_reachable": ...}` for your monitoring; it also
-tells STK once a minute that it is alive (only its version), and STK emails you if it goes quiet for an hour.
+`GET /health` on the container answers `{"ok": true, "version": ..., "stk_reachable": ..., "queued": ...}` for your
+monitoring; it also tells STK once a minute that it is alive (only its version), and STK emails you if it goes quiet for an hour.
+
+**Finished conversations are not lost (0.15).** If STK does not take a `POST /v1/conversations` (no answer, 5xx, 429),
+stk-edge answers `202 {"queued": n}` at once and keeps the rewritten body (features, no words) in
+`STK_EDGE_DATA/outbox.db`; your code need not send it again. It sends it again after 30 s, 2 min, 10 min, 1 h, then
+every hour, until STK accepts it (STK counts each `conversation_id` once and accepts them up to 30 days late; after 30
+days they are dropped). A 4xx other than 429 is logged and dropped. At most 200,000 conversations wait; beyond that the
+oldest are dropped. `queued` on `/health` is how many wait now, `queue_dropped` how many were dropped. Keep
+`STK_EDGE_DATA` on a volume so the outbox survives a restart. `/v1/decide` is never queued: if STK does not answer it
+is `503` at once, and your code escalates as before.
 
 Then call `http://edge:8001` wherever the STK integration guide (https://stk-evidence.com/integrate) says
 `https://api.stk-evidence.com`. Same requests, same answers.
 
 What is rewritten: `turns` on `POST /v1/decide`, `/v1/conversations` and `/v1/history` become masked hashed features.
-What is forwarded unchanged: everything else. To keep words in your cloud, send finished conversations as
+What is forwarded unchanged: everything else. `X-STK-Signature` is not forwarded with a rewritten body (it could not match); the key header is. To keep words in your cloud, send finished conversations as
 `/v1/conversations` through the shim, or without text at all.
 
 The hashing itself is public (see `stk/features.py`), so the numbers alone could be tested against guessed words.
