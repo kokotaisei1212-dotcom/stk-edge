@@ -32,7 +32,7 @@ This is the only part of STK that runs in your cloud. The STK engine is not incl
 
 Send the words of each finished conversation with it, through stk-edge: `"turns": [{"role", "text"}]` on
 `POST /v1/conversations`. stk-edge keeps them in your cloud for 7 days (`STK_EDGE_DATA`, a volume of yours) and then
-deletes them. STK never receives them: they are taken out before the conversation is forwarded.
+deletes them; if the customer came back, until the week's reading (at most 14 days), and deletes them once read. STK never receives them: they are taken out before the conversation is forwarded.
 
 Set your own model with one line, `STK_WHY_MODEL="<base url>|<api key>|<model>"` (any OpenAI-compatible
 `/chat/completions`, or `https://api.anthropic.com`). Once a week, on the last day of STK's week, stk-edge asks STK
